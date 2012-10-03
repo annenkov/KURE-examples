@@ -3,31 +3,22 @@ import Data.List
 import Language.KURE
 import Language.KURE.Utilities
 
+-- Source AST
+data Model = Model { modelName  :: String
+              , modelAttrs :: [Attr] }
+
+data Attr = Attr { attrName :: String
+                 , attrType :: AttrType
+                 , tags     :: [Tag] }
+            deriving Show
+
 data AttrType = AttrInteger | AttrString | AttrFloat
                 deriving Show
 
 data Tag = PK | Required
            deriving Show
 
-data Attr = Attr { attrName :: String
-                 , attrType :: AttrType
-                 , tags :: [Tag] }
-            deriving Show
-
-data Model = Model { modelName  :: String
-                   , modelAttrs :: [Attr] }
-
-data SQLType = SQLInteger | SQLVarchar | SQLReal
-
-instance Show SQLType where
-    show SQLInteger = "integer"
-    show SQLVarchar = "varchar"
-
-data Column = Column { columnName :: String
-                     , columnType :: SQLType }
-
-instance Show Column where
-    show (Column name colType) = name ++ " " ++ show colType
+-- Target AST
 
 data Table = Table { tableName :: String
                    , columns :: [Column] }
@@ -35,9 +26,23 @@ data Table = Table { tableName :: String
 instance Show Table where
     show (Table name cols) = "CREATE TABLE " ++ name ++ "(" ++ (concat $ intersperse ", " $ map show cols) ++ ")"
 
+data Column = Column { columnName :: String
+                     , columnType :: SQLType }
+
+instance Show Column where
+    show (Column name colType) = name ++ " " ++ show colType
+
+data SQLType = SQLInteger | SQLVarchar | SQLReal
+
+instance Show SQLType where
+    show SQLInteger = "integer"
+    show SQLVarchar = "varchar"
+    show SQLReal = "real"
+
+
 type TranslateE a b = Translate () KureMonad a b
 type TranslateAttr b = Translate () KureMonad Attr b
-type TranslateClass b = Translate () KureMonad Model b
+type TranslateModel b = Translate () KureMonad Model b
 
 idR = translate $ \ _ -> return
 
@@ -52,24 +57,21 @@ translateAttr  = do
     AttrString -> return $ Column name SQLVarchar
     _ -> fail $ "Translate attribute " ++ name ++ " failed. No SQL equivalent for type: " ++ show attrType
 
-translateClass :: TranslateClass Table
-translateClass = translate $ \_ (Model name attrs) -> do
+translateModel :: TranslateModel Table
+translateModel = translate $ \_ (Model name attrs) -> do
                    cols <- apply trAttrs () attrs
                    return $ Table (name ++ "_table") cols
                    
---translateClass = do
---  Class name attrs <- idR
---  columns <- trAttrs
---  return $ Table (name ++ "_table") []
-
---translateAttrType :: Attr -> Column
 translateAttr' attr =  case attr of
                             Attr name AttrInteger _ -> return $ Column name SQLInteger
                             _ -> fail "translateAttr fails"
 
-sample_attrs = [Attr "name" AttrString, Attr "age" AttrFloat]
+sampleAttrs = [Attr "name" AttrString, Attr "age" AttrFloat]
 
---trAttrs :: Translate () KureMonad [Attr] [Column]
+sampleModel = Model {modelName = "Employee", 
+                     modelAttrs = [Attr "id" AttrInteger [], 
+                                   Attr "name" AttrString [], 
+                                   Attr "age" AttrInteger []]}
 trAttrs = do
   attrs <- mapT translateAttr
   return attrs
